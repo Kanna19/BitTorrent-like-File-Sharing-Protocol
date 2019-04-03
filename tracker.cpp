@@ -4,8 +4,10 @@
 #include <sys/socket.h>     // socket()
 #include "helper_functions.h"
 #include <pthread.h>
+#include <atomic>
 
 void* serverWorker(void*);
+std::atomic <bool> terminateAllThreads;
 
 int main(int argc, char* argv[])
 {
@@ -32,6 +34,7 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
+    terminateAllThreads = false;
     pthread_t threadID[THREAD_COUNT];
     for(int i = 0; i < THREAD_COUNT; i++)
         pthread_create(&threadID[i], NULL, serverWorker, (void*)&listeningSocketFD);
@@ -48,7 +51,7 @@ void* serverWorker(void* arg)
     printf("Server Thread %lu created\n", pthread_self());
     int listeningSocketFD = *(static_cast <int*> (arg));
 
-    while(true)
+    while(!terminateAllThreads)
     {
         sockaddr_in clientAddr;
         unsigned clientLen = sizeof(clientAddr);
@@ -61,6 +64,8 @@ void* serverWorker(void* arg)
         {
             perror("Accept failed");
             closeSocket(listeningSocketFD);
+            printf("Terminating thread %lu\n", pthread_self());
+            terminateAllThreads = true;
             pthread_exit(NULL);
         }
 
