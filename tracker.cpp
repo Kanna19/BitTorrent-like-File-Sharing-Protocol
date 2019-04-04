@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
     // Check if arguments are valid
     if(argc < 2)
     {
-        printf("Usage %s <Port Number>\n", argv[0]);
+        printf("Usage: %s <Port Number>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -57,6 +57,7 @@ void* serverWorker(void* arg)
         unsigned clientLen = sizeof(clientAddr);
         memset(&clientAddr, 0, clientLen);
 
+        // Accept one client request
         int sockFD = accept(listeningSocketFD,
                             (sockaddr*) &clientAddr,
                             (socklen_t*)&clientLen);
@@ -67,6 +68,40 @@ void* serverWorker(void* arg)
             printf("Terminating thread %lu\n", pthread_self());
             terminateAllThreads = true;
             pthread_exit(NULL);
+        }
+
+        char trackerRequest[BUFF_SIZE];
+        memset(trackerRequest, 0, BUFF_SIZE);
+
+        // Receive Tracker Request from client
+        int requestMsgLen = recv(sockFD, trackerRequest, BUFF_SIZE, 0);
+
+        // Receive failed for some reason
+        if(requestMsgLen < 0)
+        {
+            perror("recv() failed");
+            closeSocket(sockFD);
+            continue;
+        }
+
+        // Connection closed by client
+        if(requestMsgLen == 0)
+        {
+            printf("Connection closed from client side\n");
+            closeSocket(sockFD);
+            continue;
+        }
+
+        // Debug
+        printf("%s\n", trackerRequest);
+        
+        std::string trackerResponse = "ok";
+        int responseLen = trackerResponse.size();
+
+        if(sendAll(sockFD, trackerResponse.c_str(), responseLen) != 0)
+        {
+            perror("sendall() failed");
+            printf("Only sent %d bytes\n", responseLen);
         }
 
         // Serve client here
