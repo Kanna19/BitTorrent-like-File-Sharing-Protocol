@@ -12,6 +12,7 @@
 int createTCPSocket();
 void bindToPort(int, short);
 void closeSocket(int);
+const int BUFF_SIZE = (1 << 15);
 
 // Creates TCP Socket
 int createTCPSocket()
@@ -51,6 +52,26 @@ void bindToPort(int sockFD, short port)
     }
 
     printf("Bound socket %d to local port %d\n", sockFD, port);
+}
+
+int sendAll(int sockFD, const char* buff, int& len)
+{
+    int total = 0;
+    int bytesLeft = len;
+    int sendRetVal = 0;
+
+    while(total < len)
+    {
+        sendRetVal = send(sockFD, buff + total, bytesLeft, 0);
+        if(sendRetVal == -1)
+            break;
+
+        total += sendRetVal;
+        bytesLeft -= sendRetVal;
+    }
+
+    len = total;
+    return (sendRetVal == -1 ? -1 : 0);
 }
 
 void closeSocket(int sockFD)
