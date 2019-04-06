@@ -9,10 +9,21 @@
 #include <vector>
 #include "bencode_parser.h"
 
-void* serverWorker(void*);
+// Type alias for vector of ip, port pairs
+using ClientList = std::vector <std::pair<std::string, int>>;
+// Set to true if termination of threads is needed
 std::atomic <bool> terminateAllThreads;
 // Filename -> Vector (IP, Port)
-std::map < std::string, std::vector <std::pair<std::string, int>> > mapping;
+std::map < std::string, ClientList > mapping;
+// Mutex for mapping
+pthread_mutex_t mappingMutex;
+
+// Function each thread executes
+void* serverWorker(void*);
+// Add the client details to mapping
+void addToMapping(std::string, std::string, int);
+// Get list of clients having this file
+ClientList getClients(std::string);
 
 int main(int argc, char* argv[])
 {
@@ -101,8 +112,22 @@ void* serverWorker(void* arg)
         printf("%s\n", trackerRequest);
         BencodeParser bencodeParser(trackerRequest);
         bencodeParser.print_details();
-        
-        std::string trackerResponse = "ok";
+        addToMapping(bencodeParser.filename, inet_ntoa(clientAddr.sin_addr), bencodeParser.port);
+
+        std::string trackerResponse = "";
+        ClientList clientList = getClients(bencodeParser.filename);
+        for(auto client : clientList)
+        {
+            trackerResponse += "2:ip";
+            trackerResponse += std::to_string(client.first.size()) + ":";
+            trackerResponse += client.first;
+            trackerResponse += "4:port";
+            trackerResponse += "i" + std::to_string(client.second) + "e";
+        }
+
+        if(trackerResponse == "")
+            trackerResponse = "empty";
+
         int responseLen = trackerResponse.size();
 
         if(sendAll(sockFD, trackerResponse.c_str(), responseLen) != 0)
@@ -116,4 +141,20 @@ void* serverWorker(void* arg)
     }
 
     return NULL;
+}
+
+void addToMapping(std::string filename, std::string ip, int port)
+{
+    // Add this client to the mapping
+    pthread_mutex_lock(&mappingMutex);
+    mapping[filename].push_back({ip, port});
+    pthread_mutex_unlock(&mappingMutex);
+}
+
+ClientList getClients(std::string filename)
+{
+    pthread_mutex_lock(&mappingMutex);
+    ClientList retVal(mapping[filename]);
+    pthread_mutex_unlock(&mappingMutex);
+    return retVal;
 }
