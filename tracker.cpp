@@ -5,9 +5,14 @@
 #include "helper_functions.h"
 #include <pthread.h>
 #include <atomic>
+#include <map>
+#include <vector>
+#include "bencode_parser.h"
 
 void* serverWorker(void*);
 std::atomic <bool> terminateAllThreads;
+// Filename -> Vector (IP, Port)
+std::map < std::string, std::vector <std::pair<std::string, int>> > mapping;
 
 int main(int argc, char* argv[])
 {
@@ -94,6 +99,8 @@ void* serverWorker(void* arg)
 
         // Debug
         printf("%s\n", trackerRequest);
+        BencodeParser bencodeParser(trackerRequest);
+        bencodeParser.print_details();
         
         std::string trackerResponse = "ok";
         int responseLen = trackerResponse.size();
