@@ -9,11 +9,13 @@
 class BencodeParser
 {
 public:
+    // Add required headers
     std::string filename;
     int port;
+    bool isSeeder;
 
     BencodeParser(std::string str = "")
-        : filename (""), port(0)
+        : filename (""), port(0), isSeeder(false)
     {
         if(str == "")
         {
@@ -65,6 +67,11 @@ public:
                 {
                     port = val_int;
                 }
+
+                else if(key == "seeder")
+                {
+                    isSeeder = true;
+                }
             }
 
             // val is string
@@ -102,6 +109,7 @@ public:
     {
         printf("Filename: %s\n", filename.c_str());
         printf("Port: %d\n", port);
+        printf("Seeder: %s\n", isSeeder ? "True" : "False");
     }
 };
 
