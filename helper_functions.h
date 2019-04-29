@@ -21,6 +21,11 @@ int createTCPSocket()
     // Create TCP socket
     int sockFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
+    struct timeval timeout;
+    timeout.tv_sec  = 5;  // after 5 seconds connect() will timeout
+    timeout.tv_usec = 0;
+    setsockopt(sockFD, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
     // Socket creation failed
     if(sockFD < 0)
     {
