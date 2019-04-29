@@ -8,7 +8,15 @@
 #include "helper_functions.h"
 #include "torrent_parser.h"
 
+const int CLIENT_QUEUED_LIMIT = 5;
+const int listenPort = 6162;
+bool finishedDownloading = false;
+
 std::string contactTracker(char*);
+
+void* uploadThread(void*);
+
+char* getPieceData(char*, int, int);
 
 int main(int argc, char* argv[])
 {
@@ -19,8 +27,30 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
+    const int UPLOADER_COUNT = 2;
+
+    // Create Listen Socket for upload threads to use
+    int listenSocket = createTCPSocket();
+    bindToPort(listenSocket, listenPort);
+
+    if(listen(listenSocket, CLIENT_QUEUED_LIMIT) < 0)
+    {
+        perror("Listen failed");
+        exit(EXIT_FAILURE);
+    }
+
+
+    // Create upload threads
+    pthread_t uploadThreadID[UPLOADER_COUNT];
+    for(int i = 0; i < UPLOADER_COUNT; i++) {
+        pthread_create(&uploadThreadID[i], NULL, uploadThread, (void*)&listenSocket);
+    }
+
+    // Contact Tracker
     std::string trackerResponse = contactTracker(argv[1]);
     printf("%s\n", trackerResponse.c_str());
+
+
     return 0;
 }
 
@@ -53,6 +83,7 @@ std::string contactTracker(char* torrentfile)
     trackerRequest += std::to_string(torrentParser.filename.size()) + ":" + torrentParser.filename;
 
     trackerRequest += "4:port";
+    // Change to listenPortConcDS@54
     trackerRequest += "i" + std::to_string(torrentParser.trackerPort) + "e";
 
     int requestLen = trackerRequest.size();
@@ -84,4 +115,74 @@ std::string contactTracker(char* torrentfile)
 
     closeSocket(sockFD);
     return trackerResponse;
+}
+
+void* uploadThread(void* arg) {
+    printf("Uploader Thread %lu created\n", pthread_self());
+    int listenSocket = *(static_cast <int*> (arg));
+
+    while(!finishedDownloading) {
+        sockaddr_in clientAddr;
+        unsigned clientLen = sizeof(clientAddr);
+        memset(&clientAddr, 0, clientLen);
+
+        // Accept one client request
+        int clientSocket = accept(listenSocket,(sockaddr*) &clientAddr, (socklen_t*)&clientLen);
+
+        char clientRequest[BUFF_SIZE];
+        memset(clientRequest, 0, BUFF_SIZE);
+
+        int requestMsgLen = recv(clientSocket, clientRequest, BUFF_SIZE, 0);
+
+        if(requestMsgLen < 0)
+        {
+            perror("recv() failed");
+            closeSocket(clientSocket);
+            continue;
+        }
+
+        // Connection closed by client
+        if(requestMsgLen == 0)
+        {
+            printf("Connection closed from client side\n");
+            closeSocket(clientSocket);
+            continue;
+        }
+
+        // Check Request Type
+        //If Pieces Info
+
+        // If Parse Request For Piece
+        // requestPiece is 0 if piece not there, use bencoding?
+        int requestPieceNumber = 3; //getPieceNumber(clientRequest)
+
+        if(requestPieceNumber) {
+            // Function to get Data, getPieceData(torrentFilename, requestPieceNumber)
+            char* requestPieceData = "";
+            int pieceLength = 10;
+            // strlen or default size?
+            sendAll(clientSocket,requestPieceData,pieceLength);
+
+            free(requestPieceData);
+        }
+
+        closeSocket(clientSocket);
+    }
+}
+
+char* getPieceData(char* torrentFilename, int requestPieceNumber, int pieceSize) {
+    TorrentParser torrentParser(torrentFilename);
+
+    FILE* fp;
+    fp = fopen(torrentParser.filename.c_str(), "r");
+
+    fseek(fp, (requestPieceNumber-1)*pieceSize, 0);
+
+    char* pieceData;
+    pieceData = (char*)malloc(sizeof(char)*pieceSize);
+    memset(pieceData,0,0);
+
+    fread(pieceData,sizeof(char),pieceSize,fp);
+
+    return pieceData;
 }
