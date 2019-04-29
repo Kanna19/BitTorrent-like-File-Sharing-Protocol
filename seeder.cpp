@@ -13,7 +13,6 @@
 
 // Constants
 const int UPLOADER_COUNT = 2;
-const int DOWNLOADER_COUNT = 2;
 const int CLIENT_QUEUED_LIMIT = 5;
 int listenPort;
 

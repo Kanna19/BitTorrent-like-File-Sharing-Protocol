@@ -32,13 +32,18 @@ std::map < std::pair <std::string, int>, std::vector <bool> > availPieces;
 
 // Thread functions
 void* uploadThread(void*);
+// TODO: Store received pieces to files
 void* downloadThread(void*);
 
+// TODO: Main thread should call this periodically to update the lists
+// Synchronization is already handled
 void updateAvailablePieces(std::string);
 
+// TODO: Change this
 char* getPieceData(char*, int, int);
 std::string contactTracker();
 
+// TODO: Write the piece selection algo in this
 std::pair <std::pair <std::string, int>, int> getPieceReq();
 
 int main(int argc, char* argv[])
@@ -190,7 +195,7 @@ std::pair <std::pair <std::string, int>, int> getPieceReq()
     pthread_mutex_unlock(&availPiecesMutex);
 
     // Decide whom to ask what
-    // Change this part to the appropriate algo req
+    // TODO: Change this part to the appropriate algo req
     auto it = avail.begin();
     std::advance(it, rand() % avail.size());
     std::vector<bool> v = it->second;
