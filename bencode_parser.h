@@ -17,9 +17,12 @@ public:
     bool bitfieldRequested;
     std::vector <std::string> peer_ip;
     std::vector <int> peer_port;
+    int pieceRequest;
 
-    BencodeParser(std::string str = "")
-        : filename (""), port(0), isSeeder(false)
+    BencodeParser(std::string str = ""):
+        filename (""), port (0), isSeeder (false),
+        bitfieldRequested (false), peer_ip (),
+        peer_port (), pieceRequest(-1)
     {
         if(str == "")
         {
@@ -85,6 +88,11 @@ public:
                 else if(key == "peerport")
                 {
                     peer_port.push_back(val_int);
+                }
+
+                else if(key == "piece")
+                {
+                    pieceRequest = val_int;
                 }
             }
 
