@@ -24,7 +24,7 @@ TorrentParser torrentParser;
 // Thread function
 void* uploadThread(void*);
 
-std::string getPieceData(int, int);
+std::pair<char*,int> getPieceData(int, int);
 std::string contactTracker();
 
 int main(int argc, char* argv[])
@@ -163,9 +163,10 @@ void* uploadThread(void* arg)
         // As this is a seeder no checking if piece is present needed
         int requestPieceNumber = bencodeParser.pieceRequest;
         printf("Requested piece: %d\n", requestPieceNumber);
-        std::string requestPieceData = getPieceData(requestPieceNumber, torrentParser.piecelen);
-        int responseLen = requestPieceData.size();
-        if(sendAll(clientSocket, requestPieceData.c_str(), responseLen) != 0)
+        auto tmp = getPieceData(requestPieceNumber, torrentParser.piecelen);
+
+        int responseLen = tmp.second;
+        if(sendAll(clientSocket, tmp.first, responseLen) != 0)
         {
             perror("sendAll() failed");
             printf("Only sent %d bytes\n", responseLen);
@@ -177,20 +178,20 @@ void* uploadThread(void* arg)
     return NULL;
 }
 
-std::string getPieceData(int requestPieceNumber, int pieceSize)
+std::pair<char*,int> getPieceData(int requestPieceNumber, int pieceSize)
 {
-    FILE* fp;
-    fp = fopen(torrentParser.filename.c_str(), "r");
+    std::fstream fp;
+    fp.open(torrentParser.filename, std::ios::in|std::ios::binary);
 
-    fseek(fp, (requestPieceNumber - 1) * pieceSize, 0);
+    fp.seekg(requestPieceNumber*pieceSize, std::ios::beg);
 
     char* pieceData;
     pieceData = (char*)malloc(sizeof(char) * pieceSize);
     memset(pieceData, 0, pieceSize);
-    fread(pieceData, sizeof(char), pieceSize, fp);
 
-    std::string ret = pieceData;
-    free(pieceData);
+    fp.read(pieceData,torrentParser.piecelen);
+    int retval = fp.gcount();
+    fp.close();
 
-    return ret;
+    return {pieceData,retval};
 }
