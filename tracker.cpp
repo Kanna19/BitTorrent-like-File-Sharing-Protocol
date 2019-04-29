@@ -9,6 +9,8 @@
 #include <vector>
 #include "bencode_parser.h"
 
+// TODO: periodically remove dead peers
+
 // Type alias for vector of ip, port pairs
 using ClientList = std::vector <std::pair<std::string, int>>;
 // Set to true if termination of threads is needed
