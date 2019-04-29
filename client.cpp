@@ -10,10 +10,12 @@
 #include "torrent_parser.h"
 #include "bencode_parser.h"
 #include <vector>
+#include <map>
+#include <cassert>
 
 // Constants
-const int UPLOADER_COUNT = 2;
-const int DOWNLOADER_COUNT = 2;
+const int UPLOADER_COUNT = 0;
+const int DOWNLOADER_COUNT = 1;
 const int CLIENT_QUEUED_LIMIT = 5;
 const int listenPort = 6162;
 
@@ -24,12 +26,20 @@ std::atomic<bool>* bitmap;
 // Parser for .torrent file
 TorrentParser torrentParser;
 
+// (IP, Port) -> Array of boolean vals
+pthread_mutex_t availPiecesMutex;
+std::map < std::pair <std::string, int>, std::vector <bool> > availPieces;
+
 // Thread functions
 void* uploadThread(void*);
 void* downloadThread(void*);
 
+void updateAvailablePieces(std::string);
+
 char* getPieceData(char*, int, int);
 std::string contactTracker();
+
+std::pair <std::pair <std::string, int>, int> getPieceReq();
 
 int main(int argc, char* argv[])
 {
@@ -64,12 +74,14 @@ int main(int argc, char* argv[])
     // Contact Tracker
     std::string trackerResponse = contactTracker();
     // printf("%s\n", trackerResponse.c_str());
+    updateAvailablePieces(trackerResponse);
 
     // Create download threads
     pthread_t downloadThreadID[DOWNLOADER_COUNT];
     for(int i = 0; i < DOWNLOADER_COUNT; i++)
-        pthread_create(&downloadThreadID[i], NULL, downloadThread, (void*)&trackerResponse);
+        pthread_create(&downloadThreadID[i], NULL, downloadThread, NULL);
 
+    // Wait for download threads to terminate
     for(int i = 0; i < DOWNLOADER_COUNT; i++)
         pthread_join(downloadThreadID[i], NULL);
 
@@ -136,6 +148,152 @@ std::string contactTracker()
     return trackerResponse;
 }
 
+void* downloadThread(void* arg)
+{
+    printf("Downloader Thread %lu created\n", pthread_self());
+
+    while(true)
+    {
+        std::pair <std::pair <std::string, int>, int> request = getPieceReq();
+
+        // Peer address
+        sockaddr_in peerAddr;
+        unsigned peerAddrLen = sizeof(peerAddr);
+        memset(&peerAddr, 0, peerAddrLen);
+        peerAddr.sin_family = AF_INET;
+        peerAddr.sin_addr.s_addr = inet_addr(request.first.first.c_str());
+        peerAddr.sin_port = htons(request.first.second);
+
+        // Create a socket and connect to the peer
+        int sockFD = createTCPSocket();
+        int connectRetVal = connect(sockFD, (sockaddr*) &peerAddr, peerAddrLen);
+        if(connectRetVal < 0)
+        {
+            perror("connect() to peer");
+            closeSocket(sockFD);
+            exit(EXIT_FAILURE);
+        }
+
+        // Send request to connected peer
+        printf("Connected to peer %s:%d\n", request.first.first.c_str(), request.first.second);
+
+        std::string peerRequest = "";
+        peerRequest += "5:piece";
+        peerRequest += "i" + std::to_string(request.second) + "e";
+        printf("Peer req: %s\n", peerRequest.c_str());
+
+        int requestLen = peerRequest.size();
+        if(sendAll(sockFD, peerRequest.c_str(), requestLen) != 0)
+        {
+            perror("sendAll() failed");
+            printf("Only sent %d bytes\n", requestLen);
+        }
+
+        std::string peerResponse = recvAll(sockFD);
+        if(peerResponse.size() == 0)
+            continue;
+
+        printf("Received piece from peer\n");
+        closeSocket(sockFD);
+        return NULL;
+    }
+
+    return NULL;
+}
+
+std::pair <std::pair <std::string, int>, int> getPieceReq()
+{
+    // Take a snapshot of all pieces available
+    pthread_mutex_lock(&availPiecesMutex);
+    std::map < std::pair <std::string, int>, std::vector <bool> > avail = availPieces;
+    pthread_mutex_unlock(&availPiecesMutex);
+
+    // Decide whom to ask what
+    // Change this part to the appropriate algo req
+    auto it = avail.begin();
+    std::advance(it, rand() % avail.size());
+    std::vector<bool> v = it->second;
+    return {it->first, rand() % torrentParser.pieces};
+}
+
+void updateAvailablePieces(std::string trackerResponse)
+{
+    printf("%s\n", trackerResponse.c_str());
+
+    // Parse the tracker response
+    BencodeParser bencodeParser(trackerResponse);
+
+    // Peer address
+    sockaddr_in peerAddr;
+    unsigned peerAddrLen = sizeof(peerAddr);
+
+    for(int i = 0; i < (int)bencodeParser.peer_ip.size(); i++)
+    {
+        memset(&peerAddr, 0, peerAddrLen);
+        peerAddr.sin_family = AF_INET;
+        peerAddr.sin_addr.s_addr = inet_addr(bencodeParser.peer_ip[i].c_str());
+        peerAddr.sin_port = htons(bencodeParser.peer_port[i]);
+
+        // Create a socket and connect to the peer
+        int sockFD = createTCPSocket();
+        int connectRetVal = connect(sockFD, (sockaddr*) &peerAddr, peerAddrLen);
+        if(connectRetVal < 0)
+        {
+            perror("connect() to peer");
+            closeSocket(sockFD);
+            exit(EXIT_FAILURE);
+        }
+
+        // Send request to connected peer
+        printf("Connected to peer %s:%d\n", bencodeParser.peer_ip[0].c_str(), bencodeParser.peer_port[0]);
+        std::string peerRequest = "";
+        peerRequest += "8:bitfield";
+        peerRequest += "i1e";
+
+        int requestLen = peerRequest.size();
+        if(sendAll(sockFD, peerRequest.c_str(), requestLen) != 0)
+        {
+            perror("sendAll() failed");
+            printf("Only sent %d bytes\n", requestLen);
+        }
+
+        // Get response from connected peer
+        char peerResponse[BUFF_SIZE];
+        memset(peerResponse, 0, BUFF_SIZE);
+
+        int responseLen = recv(sockFD, peerResponse, BUFF_SIZE, 0);
+
+        if(responseLen < 0)
+        {
+            perror("recv() failed");
+            closeSocket(sockFD);
+            return;
+        }
+
+        // Connection closed by client
+        if(responseLen == 0)
+        {
+            printf("Connection closed from client side\n");
+            closeSocket(sockFD);
+            return;
+        }
+
+        closeSocket(sockFD);
+
+        printf("Peer response: %s\n", peerResponse);
+        assert(responseLen == torrentParser.pieces);
+
+        std::vector<bool> v(torrentParser.pieces);
+        for(int i = 0; i < torrentParser.pieces; i++)
+            v[i] = (peerResponse[i] - '0');
+
+        // Update available pieces
+        pthread_mutex_lock(&availPiecesMutex);
+        availPieces[{bencodeParser.peer_ip[i], bencodeParser.peer_port[i]}] = v;
+        pthread_mutex_unlock(&availPiecesMutex);
+    }
+}
+
 void* uploadThread(void* arg)
 {
     printf("Uploader Thread %lu created\n", pthread_self());
@@ -195,95 +353,9 @@ void* uploadThread(void* arg)
             continue;
         }
 
-        /*
-        // Check Request Type
-        //If Pieces Info
-
-        // If Parse Request For Piece
-        // requestPiece is 0 if piece not there, use bencoding?
-        int requestPieceNumber = 3; //getPieceNumber(clientRequest)
-
-        if(requestPieceNumber)
-        {
-            // Function to get Data, getPieceData(torrentFilename, requestPieceNumber)
-            int pieceLength = 10;
-            char* requestPieceData = getPieceData(NULL, requestPieceNumber, pieceLength);
-            // strlen or default size?
-            sendAll(clientSocket, requestPieceData, pieceLength);
-
-            free(requestPieceData);
-        }
-        */
-
         closeSocket(clientSocket);
     }
 
-    return NULL;
-}
-
-void* downloadThread(void* arg)
-{
-    printf("Downloader Thread %lu created\n", pthread_self());
-    std::string trackerResponse = *(static_cast <std::string*> (arg));
-    printf("%s\n", trackerResponse.c_str());
-
-    // Parse the tracker response
-    BencodeParser bencodeParser(trackerResponse);
-
-    // Peer address
-    sockaddr_in peerAddr;
-    unsigned peerAddrLen = sizeof(peerAddr);
-    memset(&peerAddr, 0, peerAddrLen);
-    peerAddr.sin_family = AF_INET;
-    peerAddr.sin_addr.s_addr = inet_addr(bencodeParser.peer_ip[0].c_str());
-    peerAddr.sin_port = htons(bencodeParser.peer_port[0]);
-
-    // Create a socket and connect to the peer
-    int sockFD = createTCPSocket();
-    int connectRetVal = connect(sockFD, (sockaddr*) &peerAddr, peerAddrLen);
-    if(connectRetVal < 0)
-    {
-        perror("connect() to peer");
-        closeSocket(sockFD);
-        exit(EXIT_FAILURE);
-    }
-
-    // Send request to connected peer
-    printf("Connected to peer %s:%d\n", bencodeParser.peer_ip[0].c_str(), bencodeParser.peer_port[0]);
-    std::string peerRequest = "";
-    peerRequest += "8:bitfield";
-    peerRequest += "i1e";
-
-    int requestLen = peerRequest.size();
-    if(sendAll(sockFD, peerRequest.c_str(), requestLen) != 0)
-    {
-        perror("sendAll() failed");
-        printf("Only sent %d bytes\n", requestLen);
-    }
-
-    // Get response from connected peer
-    char peerResponse[BUFF_SIZE];
-    memset(peerResponse, 0, BUFF_SIZE);
-
-    int responseLen = recv(sockFD, peerResponse, BUFF_SIZE, 0);
-
-    if(responseLen < 0)
-    {
-        perror("recv() failed");
-        closeSocket(sockFD);
-        return NULL;
-    }
-
-    // Connection closed by client
-    if(responseLen == 0)
-    {
-        printf("Connection closed from client side\n");
-        closeSocket(sockFD);
-        return NULL;
-    }
-
-    printf("Peer response: %s\n", peerResponse);
-    closeSocket(sockFD);
     return NULL;
 }
 
