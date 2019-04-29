@@ -1,6 +1,6 @@
 filename image-small.jpg
 announceip 127.0.0.1
-announceport 4510
-piecelen 65536
-pieces 4
+announceport 4500
+piecelen 2311
+pieces 100
 length 231019
