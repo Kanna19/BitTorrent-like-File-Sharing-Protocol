@@ -112,7 +112,6 @@ void* serverWorker(void* arg)
         printf("%s\n", trackerRequest);
         BencodeParser bencodeParser(trackerRequest);
         bencodeParser.print_details();
-        addToMapping(bencodeParser.filename, inet_ntoa(clientAddr.sin_addr), bencodeParser.port);
 
         std::string trackerResponse = "";
         ClientList clientList = getClients(bencodeParser.filename);
@@ -121,7 +120,7 @@ void* serverWorker(void* arg)
             trackerResponse += "2:ip";
             trackerResponse += std::to_string(client.first.size()) + ":";
             trackerResponse += client.first;
-            trackerResponse += "4:port";
+            trackerResponse += "8:peerport";
             trackerResponse += "i" + std::to_string(client.second) + "e";
         }
 
@@ -135,6 +134,9 @@ void* serverWorker(void* arg)
             perror("sendall() failed");
             printf("Only sent %d bytes\n", responseLen);
         }
+
+        // Add this client to mapping
+        addToMapping(bencodeParser.filename, inet_ntoa(clientAddr.sin_addr), bencodeParser.port);
 
         // Serve client here
         closeSocket(sockFD);
