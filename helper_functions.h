@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
+#include <string>
 
 int createTCPSocket();
 void bindToPort(int, short);
@@ -72,6 +73,32 @@ int sendAll(int sockFD, const char* buff, int& len)
 
     len = total;
     return (sendRetVal == -1 ? -1 : 0);
+}
+
+std::string recvAll(int sockFD)
+{
+    char response[BUFF_SIZE];
+    memset(response, 0, BUFF_SIZE);
+
+    int responseLen = recv(sockFD, response, BUFF_SIZE, 0);
+
+    if(responseLen < 0)
+    {
+        perror("recv() failed");
+        closeSocket(sockFD);
+        return "";
+    }
+
+    // Connection closed by client
+    if(responseLen == 0)
+    {
+        printf("Connection closed from the other side\n");
+        closeSocket(sockFD);
+        return "";
+    }
+
+    std::string ret = response;
+    return ret;
 }
 
 void closeSocket(int sockFD)
