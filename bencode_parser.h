@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string>
 #include <assert.h>
+#include <vector>
 
 class BencodeParser
 {
@@ -13,6 +14,9 @@ public:
     std::string filename;
     int port;
     bool isSeeder;
+    bool bitfieldRequested;
+    std::vector <std::string> peer_ip;
+    std::vector <int> peer_port;
 
     BencodeParser(std::string str = "")
         : filename (""), port(0), isSeeder(false)
@@ -72,6 +76,16 @@ public:
                 {
                     isSeeder = true;
                 }
+
+                else if(key == "bitfield")
+                {
+                    bitfieldRequested = true;
+                }
+
+                else if(key == "peerport")
+                {
+                    peer_port.push_back(val_int);
+                }
             }
 
             // val is string
@@ -98,6 +112,11 @@ public:
                 if(key == "filename")
                 {
                     filename = val;
+                }
+
+                else if(key == "ip")
+                {
+                    peer_ip.push_back(val);
                 }
             }
 
