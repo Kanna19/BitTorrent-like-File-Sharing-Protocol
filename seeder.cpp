@@ -25,7 +25,7 @@ TorrentParser torrentParser;
 // Thread function
 void* uploadThread(void*);
 
-char* getPieceData(char*, int, int);
+std::string getPieceData(int, int);
 std::string contactTracker();
 
 int main(int argc, char* argv[])
@@ -184,7 +184,7 @@ void* uploadThread(void* arg)
                 peerResponse += std::to_string(bitmap[i]);
 
             // Send bitmap
-            int responseLen = torrentParser.pieces;
+            int responseLen = peerResponse.size();
             if(sendAll(clientSocket, peerResponse.c_str(), responseLen) != 0)
             {
                 perror("sendAll() failed");
@@ -196,25 +196,16 @@ void* uploadThread(void* arg)
             continue;
         }
 
-        /*
-        // Check Request Type
-        //If Pieces Info
-
-        // If Parse Request For Piece
-        // requestPiece is 0 if piece not there, use bencoding?
-        int requestPieceNumber = 3; //getPieceNumber(clientRequest)
-
-        if(requestPieceNumber)
+        // As this is a seeder no checking if piece is present needed
+        int requestPieceNumber = bencodeParser.pieceRequest;
+        printf("Requested piece: %d\n", requestPieceNumber);
+        std::string requestPieceData = getPieceData(requestPieceNumber, torrentParser.piecelen);
+        int responseLen = requestPieceData.size();
+        if(sendAll(clientSocket, requestPieceData.c_str(), responseLen) != 0)
         {
-            // Function to get Data, getPieceData(torrentFilename, requestPieceNumber)
-            int pieceLength = 10;
-            char* requestPieceData = getPieceData(NULL, requestPieceNumber, pieceLength);
-            // strlen or default size?
-            sendAll(clientSocket, requestPieceData, pieceLength);
-
-            free(requestPieceData);
+            perror("sendAll() failed");
+            printf("Only sent %d bytes\n", responseLen);
         }
-        */
 
         closeSocket(clientSocket);
     }
@@ -222,19 +213,20 @@ void* uploadThread(void* arg)
     return NULL;
 }
 
-char* getPieceData(char* torrentFilename, int requestPieceNumber, int pieceSize)
+std::string getPieceData(int requestPieceNumber, int pieceSize)
 {
-    TorrentParser torrentParser(torrentFilename);
-
     FILE* fp;
     fp = fopen(torrentParser.filename.c_str(), "r");
 
-    fseek(fp, (requestPieceNumber-1)*pieceSize, 0);
+    fseek(fp, (requestPieceNumber - 1) * pieceSize, 0);
 
     char* pieceData;
-    pieceData = (char*)malloc(sizeof(char)*pieceSize);
-    memset(pieceData,0,0);
+    pieceData = (char*)malloc(sizeof(char) * pieceSize);
+    memset(pieceData, 0, pieceSize);
+    fread(pieceData, sizeof(char), pieceSize, fp);
 
-    fread(pieceData,sizeof(char),pieceSize,fp);
-    return pieceData;
+    std::string ret = pieceData;
+    free(pieceData);
+
+    return ret;
 }
