@@ -17,16 +17,13 @@ const int DOWNLOADER_COUNT = 2;
 const int CLIENT_QUEUED_LIMIT = 5;
 int listenPort;
 
-// Set to true if downloading the required file is done.
-std::atomic<bool> finishedDownloading(false);
 // Bitmap representing the pieces present
 std::atomic<bool>* bitmap;
 // Parser for .torrent file
 TorrentParser torrentParser;
 
-// Thread functions
+// Thread function
 void* uploadThread(void*);
-void* downloadThread(void*);
 
 char* getPieceData(char*, int, int);
 std::string contactTracker();
@@ -48,6 +45,8 @@ int main(int argc, char* argv[])
 
     // Initialize bitmap
     bitmap = new std::atomic <bool> [torrentParser.pieces];
+    for(int i = 0; i < torrentParser.pieces; i++)
+        bitmap[i] = true;
 
     // Create Listen Socket for upload threads to use
     int listenSocket = createTCPSocket();
@@ -143,7 +142,7 @@ void* uploadThread(void* arg)
     printf("Uploader Thread %lu created\n", pthread_self());
     int listenSocket = *(static_cast <int*> (arg));
 
-    while(!finishedDownloading)
+    while(true)
     {
         sockaddr_in clientAddr;
         unsigned clientLen = sizeof(clientAddr);
