@@ -113,26 +113,7 @@ std::string contactTracker()
         printf("Only sent %d bytes\n", requestLen);
     }
 
-    char trackerResponse[BUFF_SIZE];
-    memset(trackerResponse, 0, BUFF_SIZE);
-
-    int responseLen = recv(sockFD, trackerResponse, BUFF_SIZE, 0);
-    // Receive failed for some reason
-    if(responseLen < 0)
-    {
-        perror("recv() failed");
-        closeSocket(sockFD);
-        return "";
-    }
-
-    // Connection closed by tracker
-    if(responseLen == 0)
-    {
-        printf("Tracker closed connection without responding\n");
-        closeSocket(sockFD);
-        return "";
-    }
-
+    std::string trackerResponse = recvAll(sockFD);
     closeSocket(sockFD);
     return trackerResponse;
 }
@@ -151,25 +132,9 @@ void* uploadThread(void* arg)
         // Accept one client request
         int clientSocket = accept(listenSocket,(sockaddr*) &clientAddr, (socklen_t*)&clientLen);
 
-        char clientRequest[BUFF_SIZE];
-        memset(clientRequest, 0, BUFF_SIZE);
-
-        int requestMsgLen = recv(clientSocket, clientRequest, BUFF_SIZE, 0);
-
-        if(requestMsgLen < 0)
-        {
-            perror("recv() failed");
-            closeSocket(clientSocket);
+        std::string clientRequest = recvAll(clientSocket);
+        if(clientRequest == "")
             continue;
-        }
-
-        // Connection closed by client
-        if(requestMsgLen == 0)
-        {
-            printf("Connection closed from client side\n");
-            closeSocket(clientSocket);
-            continue;
-        }
 
         // Parse the client request
         BencodeParser bencodeParser(clientRequest);

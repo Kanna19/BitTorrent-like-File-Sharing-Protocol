@@ -86,30 +86,12 @@ void* serverWorker(void* arg)
             pthread_exit(NULL);
         }
 
-        char trackerRequest[BUFF_SIZE];
-        memset(trackerRequest, 0, BUFF_SIZE);
-
-        // Receive Tracker Request from client
-        int requestMsgLen = recv(sockFD, trackerRequest, BUFF_SIZE, 0);
-
-        // Receive failed for some reason
-        if(requestMsgLen < 0)
-        {
-            perror("recv() failed");
-            closeSocket(sockFD);
+        std::string trackerRequest = recvAll(sockFD);
+        if(trackerRequest == "")
             continue;
-        }
-
-        // Connection closed by client
-        if(requestMsgLen == 0)
-        {
-            printf("Connection closed from client side\n");
-            closeSocket(sockFD);
-            continue;
-        }
 
         // Debug
-        printf("%s\n", trackerRequest);
+        printf("%s\n", trackerRequest.c_str());
         BencodeParser bencodeParser(trackerRequest);
         bencodeParser.print_details();
 
