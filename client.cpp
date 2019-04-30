@@ -43,7 +43,7 @@ std::string outFolderName;
 
 // Thread functions
 void* uploadThread(void*);
-// TODO: Store received pieces to files
+
 void* downloadThread(void*);
 
 void* priorityUploadThread(void*);
@@ -53,15 +53,12 @@ std::pair<char*, int>getFileData(int);
 //Function to merge all collected pieces
 void mergePieces();
 
-// TODO: Main thread should call this periodically to update the lists
 // Synchronization is already handled
 void updateAvailablePieces(std::string);
 
-// TODO: Change this
 char* getPieceData(char*, int, int);
 std::string contactTracker();
 
-// TODO: Write the piece selection algo in this
 std::pair <std::pair <std::string, int>, int> createPieceReq();
 
 int main(int argc, char* argv[])
@@ -279,7 +276,6 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
 
     printf("I AM HERE\n");
     // Decide whom to ask what
-    // TODO: Change this part to the appropriate algo req
 
     std::vector<std::pair<std::pair<std::string, int>, std::vector <bool> >> random_avail_vector;
     auto it = avail.begin();
