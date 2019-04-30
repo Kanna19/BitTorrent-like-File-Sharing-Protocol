@@ -277,8 +277,18 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
     std::map < std::pair <std::string, int>, std::vector <bool> > avail = availPieces;
     pthread_mutex_unlock(&availPiecesMutex);
 
+    printf("I AM HERE\n");
     // Decide whom to ask what
     // TODO: Change this part to the appropriate algo req
+
+    std::vector<std::pair<std::pair<std::string, int>, std::vector <bool> >> random_avail_vector;
+    auto it = avail.begin();
+    for(int i=0; i<avail.size(); i++) {
+        random_avail_vector.push_back({it->first,it->second});
+        it++;
+    }
+
+    std::random_shuffle(random_avail_vector.begin(), random_avail_vector.end());
 
     // Go piece by piece and iterate avail pieces for each piece
     if(MODE == "DEFAULT") {
@@ -286,9 +296,12 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
             if(bitmap[i]) {
                 continue;
             }
-            for(auto it : avail) {
-                if(it.second[i]) {
-                    return make_pair(it.first,i);
+
+            for(int j=0; j<random_avail_vector.size(); j++) {
+                if(random_avail_vector[j].second[i]) {
+                    printf("Requesting piece from: %s %d\n",
+                            random_avail_vector[j].first.first.c_str(),random_avail_vector[j].first.second);
+                    return {random_avail_vector[j].first,i};
                 }
             }
         }
@@ -309,9 +322,11 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
             if(bitmap[pieceNum]) {
                 continue;
             }
-            for(auto it : avail) {
-                if(it.second[pieceNum]) {
-                    return make_pair(it.first,pieceNum);
+            for(int j=0; j<random_avail_vector.size(); j++) {
+                if(random_avail_vector[j].second[pieceNum]) {
+                    printf("Requesting piece from: %s %d\n",
+                            random_avail_vector[j].first.first.c_str(),random_avail_vector[j].first.second);
+                    return {random_avail_vector[j].first,pieceNum};
                 }
             }
         }
@@ -338,9 +353,11 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
             if(bitmap[pieceNum]) {
                 continue;
             }
-            for(auto it : avail) {
-                if(it.second[pieceNum]) {
-                    return make_pair(it.first,pieceNum);
+            for(int j=0; j<random_avail_vector.size(); j++) {
+                if(random_avail_vector[j].second[pieceNum]) {
+                    printf("Requesting piece from: %s %d\n",
+                            random_avail_vector[j].first.first.c_str(),random_avail_vector[j].first.second);
+                    return {random_avail_vector[j].first,pieceNum};
                 }
             }
         }
