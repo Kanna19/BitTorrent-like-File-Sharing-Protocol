@@ -8,6 +8,7 @@
 #include <map>
 #include <vector>
 #include "bencode_parser.h"
+#include <algorithm>
 
 // TODO: periodically remove dead peers
 
@@ -133,7 +134,8 @@ void addToMapping(std::string filename, std::string ip, int port)
 {
     // Add this client to the mapping
     pthread_mutex_lock(&mappingMutex);
-    mapping[filename].push_back({ip, port});
+    if(std::find(mapping[filename].begin(), mapping[filename].end(), make_pair(ip, port)) == mapping[filename].end())
+        mapping[filename].push_back({ip, port});
     pthread_mutex_unlock(&mappingMutex);
 }
 
