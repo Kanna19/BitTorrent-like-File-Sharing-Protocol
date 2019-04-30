@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 #include <string>
 #include <stdlib.h>
 #include <pthread.h>
@@ -21,6 +22,7 @@ const int CLIENT_QUEUED_LIMIT = 5;
 int listenPort = 6162;
 const std::string MY_IP = "127.0.0.1";
 const int THRESHOLD = 10;
+std::string MODE = "DEFAULT";
 
 // Set to true if downloading the required file is done.
 std::atomic<bool> finishedDownloading(false);
@@ -65,9 +67,9 @@ std::pair <std::pair <std::string, int>, int> createPieceReq();
 int main(int argc, char* argv[])
 {
     // Check if arguments are valid
-    if(argc < 4)
+    if(argc < 5)
     {
-        printf("Usage: %s <Torrent Filename> <Output Folder Name> <Listen-Port>\n", argv[0]);
+        printf("Usage: %s <Torrent Filename> <Output Folder Name> <Listen-Port> <Mode>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -80,6 +82,9 @@ int main(int argc, char* argv[])
 
     //Listen Port
     listenPort = atoi(argv[3]);
+
+    // Set Mode
+    MODE = std::string(argv[4]);
 
     // Initialize bitmap
     bitmap = new std::atomic <bool> [torrentParser.pieces];
@@ -276,16 +281,71 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
     // TODO: Change this part to the appropriate algo req
 
     // Go piece by piece and iterate avail pieces for each piece
-    for(int i=0; i<torrentParser.pieces; i++) {
-        if(bitmap[i]) {
-            continue;
-        }
-        for(auto it : avail) {
-            if(it.second[i]) {
-                return make_pair(it.first,i);
+    if(MODE == "DEFAULT") {
+        for(int i=0; i<torrentParser.pieces; i++) {
+            if(bitmap[i]) {
+                continue;
+            }
+            for(auto it : avail) {
+                if(it.second[i]) {
+                    return make_pair(it.first,i);
+                }
             }
         }
     }
+
+    //Random Pieces
+
+    else if(MODE == "RANDOM") {
+        std::vector<int> random_vector;
+        for(int i=0; i<torrentParser.pieces; i++) {
+            random_vector.push_back(i);
+        }
+        std::random_shuffle(random_vector.begin(), random_vector.end());
+
+        for(int i=0; i<torrentParser.pieces; i++) {
+            int pieceNum = random_vector[i];
+
+            if(bitmap[pieceNum]) {
+                continue;
+            }
+            for(auto it : avail) {
+                if(it.second[pieceNum]) {
+                    return make_pair(it.first,pieceNum);
+                }
+            }
+        }
+    }
+
+    //Rarest piece
+    else if(MODE == "RARE") {
+        std::vector<std::pair<int,int>> pieceCount;
+        for(int i=0; i<torrentParser.pieces; i++) {
+            pieceCount.push_back({0,i});
+        }
+
+        for(int i=0; i<torrentParser.pieces; i++) {
+            for(auto it : avail) {
+                pieceCount[i].first += it.second[i];
+            }
+        }
+
+        std::sort(pieceCount.begin(), pieceCount.end());
+
+        for(int i=0; i<torrentParser.pieces; i++) {
+            int pieceNum = pieceCount[i].second;
+
+            if(bitmap[pieceNum]) {
+                continue;
+            }
+            for(auto it : avail) {
+                if(it.second[pieceNum]) {
+                    return make_pair(it.first,pieceNum);
+                }
+            }
+        }
+    }
+
 
     return {{"",0},-1};
 }
