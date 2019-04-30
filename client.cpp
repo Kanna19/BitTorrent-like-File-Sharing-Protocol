@@ -156,7 +156,7 @@ std::string contactTracker()
     trackerRequest += std::to_string(torrentParser.filename.size()) + ":" + torrentParser.filename;
 
     trackerRequest += "4:port";
-    // Change to listenPortConcDS@54
+    // Change to listenPort
     trackerRequest += "i" + std::to_string(listenPort) + "e";
 
     int requestLen = trackerRequest.size();
@@ -279,7 +279,7 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
 
     std::vector<std::pair<std::pair<std::string, int>, std::vector <bool> >> random_avail_vector;
     auto it = avail.begin();
-    for(int i=0; i<avail.size(); i++) {
+    for(int i=0; i<(int)avail.size(); i++) {
         random_avail_vector.push_back({it->first,it->second});
         it++;
     }
@@ -293,7 +293,7 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
                 continue;
             }
 
-            for(int j=0; j<random_avail_vector.size(); j++) {
+            for(int j=0; j<(int)random_avail_vector.size(); j++) {
                 if(random_avail_vector[j].second[i]) {
                     printf("Requesting piece from: %s %d\n",
                             random_avail_vector[j].first.first.c_str(),random_avail_vector[j].first.second);
@@ -318,7 +318,7 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
             if(bitmap[pieceNum]) {
                 continue;
             }
-            for(int j=0; j<random_avail_vector.size(); j++) {
+            for(int j=0; j<(int)random_avail_vector.size(); j++) {
                 if(random_avail_vector[j].second[pieceNum]) {
                     printf("Requesting piece from: %s %d\n",
                             random_avail_vector[j].first.first.c_str(),random_avail_vector[j].first.second);
@@ -349,7 +349,7 @@ std::pair <std::pair <std::string, int>, int> createPieceReq()
             if(bitmap[pieceNum]) {
                 continue;
             }
-            for(int j=0; j<random_avail_vector.size(); j++) {
+            for(int j=0; j<(int)random_avail_vector.size(); j++) {
                 if(random_avail_vector[j].second[pieceNum]) {
                     printf("Requesting piece from: %s %d\n",
                             random_avail_vector[j].first.first.c_str(),random_avail_vector[j].first.second);
